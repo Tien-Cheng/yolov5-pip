@@ -25,19 +25,19 @@ class TritonRemoteModel:
             from tritonclient.grpc import InferenceServerClient, InferInput
 
             self.client = InferenceServerClient(parsed_url.netloc)  # Triton GRPC client
-            model_repository = self.client.get_model_repository_index()
-            self.model_name = model_repository.models[0].name
+            # model_repository = self.client.get_model_repository_index()
+            self.model_name = "yolov5" # TODO: get dynamically
             self.metadata = self.client.get_model_metadata(self.model_name, as_json=True)
 
-            def create_input_placeholders() -> typing.List[InferInput]:
+            def create_input_placeholders(batch_size: int = 1) -> typing.List[InferInput]:
                 return [
-                    InferInput(i['name'], [int(s) for s in i["shape"]], i['datatype']) for i in self.metadata['inputs']]
+                    InferInput(i['name'], [batch_size] + [int(s) for s in i["shape"][1:]], i['datatype']) for i in self.metadata['inputs']]
 
         else:
             from tritonclient.http import InferenceServerClient, InferInput
 
             self.client = InferenceServerClient(parsed_url.netloc)  # Triton HTTP client
-            model_repository = self.client.get_model_repository_index()
+            # model_repository = self.client.get_model_repository_index()
             self.model_name = model_repository[0]['name']
             self.metadata = self.client.get_model_metadata(self.model_name)
 
@@ -71,8 +71,8 @@ class TritonRemoteModel:
             raise RuntimeError("No inputs provided.")
         if args_len and kwargs_len:
             raise RuntimeError("Cannot specify args and kwargs at the same time")
-
-        placeholders = self._create_input_placeholders_fn()
+        batch_size = args_len or kwargs_len
+        placeholders = self._create_input_placeholders_fn(batch_size)
         if args_len:
             if args_len != len(placeholders):
                 raise RuntimeError(f"Expected {len(placeholders)} inputs, got {args_len}.")
